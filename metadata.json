@@ -1,0 +1,6 @@
+{
+  "name": "Offline Audio Reader",
+  "description": "Offline audio reader for PDF, Word (DOCX/DOC), scanned documents & images via offline OCR, text, and e-books with on-the-go listening mode, synchronized text highlighting, and speech playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
