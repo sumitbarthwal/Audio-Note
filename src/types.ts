@@ -59,3 +59,13 @@ export interface SleepTimerState {
 export type ReaderTheme = 'oled' | 'dark' | 'sepia' | 'light';
 export type ReaderFont = 'sans' | 'serif' | 'mono' | 'dyslexic';
 
+export interface DocumentSearchMatch {
+  id: string;
+  sectionIndex: number;
+  sectionTitle: string;
+  charOffset: number;
+  matchLength: number;
+  textSnippet: string;
+  matchIndex: number;
+}
+

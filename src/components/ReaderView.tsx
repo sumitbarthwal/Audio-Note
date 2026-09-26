@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { audioEngine } from '../lib/audioEngine';
-import { DocumentItem, PlaybackState, ReaderTheme, ReaderFont, BookmarkItem } from '../types';
+import { DocumentItem, PlaybackState, ReaderTheme, ReaderFont, BookmarkItem, DocumentSearchMatch } from '../types';
 import { updateReadingProgress } from '../lib/db';
+import { DocumentSearchBar } from './DocumentSearchBar';
 import {
   BookOpen,
   List,
@@ -16,6 +17,7 @@ import {
   X,
   Play,
   Pause,
+  Search,
 } from 'lucide-react';
 
 interface ReaderViewProps {
@@ -38,7 +40,131 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [showTypographyMenu, setShowTypographyMenu] = useState<boolean>(false);
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(document.bookmarks || []);
 
+  // In-document Search State
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [caseSensitive, setCaseSensitive] = useState<boolean>(false);
+  const [wholeWord, setWholeWord] = useState<boolean>(false);
+  const [activeMatchIndex, setActiveMatchIndex] = useState<number>(0);
+
   const activeSectionRef = useRef<HTMLDivElement>(null);
+
+  // Global keyboard shortcut to open / close search (Cmd+F / Ctrl+F / Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      } else if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen]);
+
+  // Compute all matches across document sections
+  const searchMatches = useMemo<DocumentSearchMatch[]>(() => {
+    if (!isSearchOpen || !searchQuery.trim()) return [];
+    const trimmed = searchQuery.trim();
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped;
+    const flags = caseSensitive ? 'g' : 'gi';
+    let regex: RegExp;
+    try {
+      regex = new RegExp(pattern, flags);
+    } catch {
+      return [];
+    }
+
+    const results: DocumentSearchMatch[] = [];
+    let overallIndex = 0;
+
+    document.sections.forEach((sec, sIdx) => {
+      let match: RegExpExecArray | null;
+      regex.lastIndex = 0;
+      while ((match = regex.exec(sec.text)) !== null) {
+        const charOffset = match.index;
+        const matchLength = match[0].length;
+        const startSnippet = Math.max(0, charOffset - 40);
+        const endSnippet = Math.min(sec.text.length, charOffset + matchLength + 40);
+        const snippetPrefix = startSnippet > 0 ? '...' : '';
+        const snippetSuffix = endSnippet < sec.text.length ? '...' : '';
+        const textSnippet = snippetPrefix + sec.text.slice(startSnippet, endSnippet) + snippetSuffix;
+
+        results.push({
+          id: `match_${sIdx}_${charOffset}_${overallIndex}`,
+          sectionIndex: sIdx,
+          sectionTitle: sec.title || `Section ${sIdx + 1}`,
+          charOffset,
+          matchLength,
+          textSnippet,
+          matchIndex: overallIndex,
+        });
+
+        overallIndex++;
+        if (matchLength === 0) {
+          regex.lastIndex++;
+        }
+      }
+    });
+
+    return results;
+  }, [document.sections, searchQuery, isSearchOpen, caseSensitive, wholeWord]);
+
+  // Adjust activeMatchIndex when matches list changes
+  useEffect(() => {
+    if (activeMatchIndex >= searchMatches.length) {
+      setActiveMatchIndex(0);
+    }
+  }, [searchMatches.length, activeMatchIndex]);
+
+  // Scroll active search match into view
+  useEffect(() => {
+    if (isSearchOpen && searchMatches.length > 0 && activeMatchIndex >= 0) {
+      const match = searchMatches[activeMatchIndex];
+      if (match) {
+        const el = document.getElementById(`search-match-${activeMatchIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }, [activeMatchIndex, searchMatches, isSearchOpen]);
+
+  // Index matches by section for fast per-section rendering
+  const matchesBySection = useMemo(() => {
+    const map = new Map<number, DocumentSearchMatch[]>();
+    for (const m of searchMatches) {
+      const list = map.get(m.sectionIndex) || [];
+      list.push(m);
+      map.set(m.sectionIndex, list);
+    }
+    return map;
+  }, [searchMatches]);
+
+  const handleNextMatch = () => {
+    if (searchMatches.length === 0) return;
+    setActiveMatchIndex((prev) => (prev + 1) % searchMatches.length);
+  };
+
+  const handlePrevMatch = () => {
+    if (searchMatches.length === 0) return;
+    setActiveMatchIndex((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
+  };
+
+  const handleSelectMatch = (index: number) => {
+    if (index >= 0 && index < searchMatches.length) {
+      setActiveMatchIndex(index);
+    }
+  };
+
+  const handlePlayFromMatch = (match: DocumentSearchMatch) => {
+    audioEngine.jumpToSection(match.sectionIndex, match.charOffset);
+    if (!playbackState.isPlaying) {
+      audioEngine.play();
+    }
+  };
 
   useEffect(() => {
     const unsub = audioEngine.subscribe((state) => {
@@ -104,6 +230,116 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     dyslexic: 'font-sans tracking-wide leading-loose',
   }[font];
 
+  // Render section text with search highlighting and current word speech indicator
+  const renderSectionText = (section: (typeof document.sections)[0], sIdx: number) => {
+    const isCurrent = sIdx === playbackState.currentSectionIndex;
+    const secMatches = matchesBySection.get(sIdx) || [];
+
+    // If no search matches in this section
+    if (secMatches.length === 0) {
+      if (!isCurrent) return section.text;
+
+      const charOffset = playbackState.currentWordIndex;
+      const before = section.text.slice(0, charOffset);
+      const activeWord = playbackState.currentWord;
+      const after = section.text.slice(charOffset + (activeWord?.length || 0));
+
+      return (
+        <span>
+          <span>{before}</span>
+          {activeWord ? (
+            <span className="bg-indigo-500 text-white font-semibold px-1.5 py-0.5 rounded shadow-sm">
+              {activeWord}
+            </span>
+          ) : null}
+          <span>{after}</span>
+        </span>
+      );
+    }
+
+    // Segment text by boundaries of all matches & spoken word
+    const boundaries = new Set<number>([0, section.text.length]);
+    for (const m of secMatches) {
+      boundaries.add(Math.max(0, m.charOffset));
+      boundaries.add(Math.min(section.text.length, m.charOffset + m.matchLength));
+    }
+
+    const wordStart = isCurrent ? playbackState.currentWordIndex : -1;
+    const wordEnd = isCurrent ? wordStart + (playbackState.currentWord?.length || 0) : -1;
+    if (wordStart >= 0 && wordEnd > wordStart && wordEnd <= section.text.length) {
+      boundaries.add(wordStart);
+      boundaries.add(wordEnd);
+    }
+
+    const sorted = Array.from(boundaries).sort((a, b) => a - b);
+    const elements: React.ReactNode[] = [];
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const start = sorted[i];
+      const end = sorted[i + 1];
+      const segmentText = section.text.slice(start, end);
+      if (!segmentText) continue;
+
+      const match = secMatches.find((m) => start >= m.charOffset && end <= m.charOffset + m.matchLength);
+      const isCurMatch = match ? match.matchIndex === activeMatchIndex : false;
+      const isWord = wordStart >= 0 && start >= wordStart && end <= wordEnd;
+
+      if (isCurMatch) {
+        elements.push(
+          <mark
+            key={`seg-${i}-${start}`}
+            id={`search-match-${match?.matchIndex}`}
+            onClick={(e) => {
+              if (match) {
+                e.stopPropagation();
+                setActiveMatchIndex(match.matchIndex);
+              }
+            }}
+            className={`font-bold px-1 py-0.5 rounded shadow-lg transition-all cursor-pointer ${
+              isWord
+                ? 'bg-amber-400 text-black ring-2 ring-indigo-400 ring-offset-2 ring-offset-[#0D0F16]'
+                : 'bg-amber-400 text-black ring-2 ring-amber-300 ring-offset-1 ring-offset-[#0D0F16]'
+            }`}
+            title={`Match #${(match?.matchIndex ?? 0) + 1} (Click to focus)`}
+          >
+            {segmentText}
+          </mark>
+        );
+      } else if (match) {
+        elements.push(
+          <mark
+            key={`seg-${i}-${start}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMatchIndex(match.matchIndex);
+            }}
+            className={`px-0.5 rounded transition-colors cursor-pointer ${
+              isWord
+                ? 'bg-indigo-600 text-amber-200 font-bold border-b-2 border-amber-300'
+                : 'bg-amber-400/25 text-amber-200 border-b-2 border-amber-400/70 hover:bg-amber-400/40'
+            }`}
+            title={`Match #${match.matchIndex + 1} (Click to focus)`}
+          >
+            {segmentText}
+          </mark>
+        );
+      } else if (isWord) {
+        elements.push(
+          <span
+            key={`seg-${i}-${start}`}
+            className="bg-indigo-500 text-white font-semibold px-1.5 py-0.5 rounded shadow-sm"
+          >
+            {segmentText}
+          </span>
+        );
+      } else {
+        elements.push(<span key={`seg-${i}-${start}`}>{segmentText}</span>);
+      }
+    }
+
+    return <span>{elements}</span>;
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses} pb-32 transition-colors duration-200`}>
       {/* Reader Top Controls Toolbar */}
@@ -125,6 +361,29 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Search within document button */}
+            <button
+              id="reader-search-btn"
+              onClick={() => {
+                setShowTypographyMenu(false);
+                setIsSearchOpen(!isSearchOpen);
+              }}
+              className={`p-2 rounded-xl border transition text-xs flex items-center gap-1.5 ${
+                isSearchOpen
+                  ? 'text-indigo-300 bg-indigo-500/20 border-indigo-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5 border-white/5'
+              }`}
+              title="Search within document (Ctrl+F / ⌘F)"
+            >
+              <Search className="w-4 h-4 text-indigo-400" />
+              <span className="hidden sm:inline">Find</span>
+              {searchMatches.length > 0 && (
+                <span className="bg-indigo-500 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full">
+                  {searchMatches.length}
+                </span>
+              )}
+            </button>
+
             {/* Table of Contents Button */}
             <button
               onClick={() => setShowTOC(true)}
@@ -267,6 +526,24 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         </div>
       </header>
 
+      {/* Sticky In-Document Search Bar */}
+      <DocumentSearchBar
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        caseSensitive={caseSensitive}
+        onToggleCaseSensitive={() => setCaseSensitive(!caseSensitive)}
+        wholeWord={wholeWord}
+        onToggleWholeWord={() => setWholeWord(!wholeWord)}
+        matches={searchMatches}
+        activeMatchIndex={activeMatchIndex}
+        onNextMatch={handleNextMatch}
+        onPrevMatch={handlePrevMatch}
+        onSelectMatch={handleSelectMatch}
+        onPlayFromMatch={handlePlayFromMatch}
+      />
+
       {/* Main Document Reading Canvas */}
       <main className="max-w-3xl mx-auto px-5 py-8 space-y-8">
         {/* Document Title Header */}
@@ -292,30 +569,12 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             const isCurrent = idx === playbackState.currentSectionIndex;
             const isSpeakingNow = isCurrent && playbackState.isPlaying;
 
-            // Highlight words within current paragraph
-            let contentDisplay: React.ReactNode = section.text;
-            if (isCurrent) {
-              const charOffset = playbackState.currentWordIndex;
-              const before = section.text.slice(0, charOffset);
-              const activeWord = playbackState.currentWord;
-              const after = section.text.slice(charOffset + (activeWord?.length || 0));
-
-              contentDisplay = (
-                <span>
-                  <span>{before}</span>
-                  {activeWord ? (
-                    <span className="bg-indigo-500 text-white font-semibold px-1.5 py-0.5 rounded shadow-sm">
-                      {activeWord}
-                    </span>
-                  ) : null}
-                  <span>{after}</span>
-                </span>
-              );
-            }
+            // Highlight words within current paragraph and search matches
+            const contentDisplay = renderSectionText(section, idx);
 
             return (
               <div
-                key={section.id}
+                key={`${section.id}-${idx}`}
                 ref={isCurrent ? activeSectionRef : null}
                 onClick={() => handleParagraphClick(idx)}
                 className={`p-6 sm:p-7 rounded-[28px] cursor-pointer transition-all duration-300 relative group border ${
@@ -385,6 +644,24 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-4">
+              {/* Quick Search in Document trigger */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTOC(false);
+                  setIsSearchOpen(true);
+                }}
+                className="w-full text-left p-3 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-300 text-xs font-medium flex items-center justify-between transition group"
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <span>Search Text in Document</span>
+                </div>
+                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded font-mono text-slate-300">
+                  Ctrl+F
+                </span>
+              </button>
+
               {/* Bookmarks list */}
               {bookmarks.length > 0 && (
                 <div className="space-y-2">
@@ -392,9 +669,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                     Saved Bookmarks ({bookmarks.length})
                   </span>
                   <div className="space-y-1.5">
-                    {bookmarks.map((bm) => (
+                    {bookmarks.map((bm, bIdx) => (
                       <button
-                        key={bm.id}
+                        key={`${bm.id}-${bm.sectionIndex}-${bIdx}`}
                         onClick={() => {
                           audioEngine.jumpToSection(bm.sectionIndex, bm.charOffset);
                           setShowTOC(false);
@@ -419,7 +696,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                     const isCur = idx === playbackState.currentSectionIndex;
                     return (
                       <button
-                        key={sec.id}
+                        key={`${sec.id}-${idx}`}
                         onClick={() => {
                           audioEngine.jumpToSection(idx, 0);
                           setShowTOC(false);

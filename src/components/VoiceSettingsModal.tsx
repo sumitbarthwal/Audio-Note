@@ -24,21 +24,34 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({ isOpen, 
   const uniqueLanguages = useMemo(() => {
     const langs = new Set<string>();
     voices.forEach((v) => {
-      const prefix = v.lang.split('-')[0].toLowerCase();
-      langs.add(prefix);
+      if (v.lang) {
+        const prefix = v.lang.split('-')[0].trim().toLowerCase();
+        if (prefix) langs.add(prefix);
+      }
     });
     return Array.from(langs).sort();
   }, [voices]);
 
   const filteredVoices = useMemo(() => {
-    return voices.filter((v) => {
+    const seen = new Set<string>();
+    const list: SpeechSynthesisVoice[] = [];
+
+    for (const v of voices) {
       const matchesSearch =
         v.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
         v.lang.toLowerCase().includes(searchFilter.toLowerCase());
       const matchesLang =
         selectedLang === 'all' || v.lang.toLowerCase().startsWith(selectedLang.toLowerCase());
-      return matchesSearch && matchesLang;
-    });
+
+      if (matchesSearch && matchesLang) {
+        const key = v.voiceURI ? `uri:${v.voiceURI}` : `name:${v.name}_${v.lang}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          list.push(v);
+        }
+      }
+    }
+    return list;
   }, [voices, searchFilter, selectedLang]);
 
   if (!isOpen) return null;
@@ -235,11 +248,11 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({ isOpen, 
                   No matching voices found. System default voice will be used.
                 </div>
               ) : (
-                filteredVoices.map((v) => {
+                filteredVoices.map((v, idx) => {
                   const isSelected = settings.voiceURI === v.voiceURI;
                   return (
                     <button
-                      key={v.voiceURI}
+                      key={`${v.voiceURI || v.name || 'voice'}-${v.lang}-${idx}`}
                       type="button"
                       onClick={() => handleSelectVoice(v.voiceURI, v.lang)}
                       className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition ${

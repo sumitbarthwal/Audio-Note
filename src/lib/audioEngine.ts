@@ -49,15 +49,26 @@ class AudioEngine {
 
   private loadVoices() {
     if (!this.synth) return;
-    const voiceList = this.synth.getVoices();
-    if (voiceList.length > 0) {
-      this.voices = voiceList;
+    const rawList = this.synth.getVoices();
+    if (rawList.length > 0) {
+      // Deduplicate voices that share the same voiceURI or composite key
+      const seen = new Set<string>();
+      const deduped: SpeechSynthesisVoice[] = [];
+      for (const v of rawList) {
+        const key = v.voiceURI ? `uri:${v.voiceURI}` : `name:${v.name}_${v.lang}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(v);
+        }
+      }
+      this.voices = deduped.length > 0 ? deduped : rawList;
+
       // Auto pick best matching voice if not set
       if (!this.settings.voiceURI) {
         const preferred =
-          voiceList.find((v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Enhanced'))) ||
-          voiceList.find((v) => v.lang.startsWith('en')) ||
-          voiceList[0];
+          this.voices.find((v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Enhanced'))) ||
+          this.voices.find((v) => v.lang.startsWith('en')) ||
+          this.voices[0];
         if (preferred) {
           this.settings.voiceURI = preferred.voiceURI;
           this.settings.lang = preferred.lang;
