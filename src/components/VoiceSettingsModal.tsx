@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { audioEngine } from '../lib/audioEngine';
 import { VoiceSettings } from '../types';
-import { X, Volume2, Gauge, Sliders, Check, Globe } from 'lucide-react';
+import { X, Volume2, Gauge, Sliders, Check, Globe, RotateCw } from 'lucide-react';
 
 interface VoiceSettingsModalProps {
   isOpen: boolean;
@@ -205,10 +205,24 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({ isOpen, 
           {/* Voice Picker */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-indigo-400" />
-                Available Offline Synthesizers ({voices.length})
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                  Available Offline Synthesizers ({voices.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                      setVoices(window.speechSynthesis.getVoices());
+                    }
+                  }}
+                  className="p-1 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-white/5 transition"
+                  title="Refresh system voices"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={handleTestVoice}

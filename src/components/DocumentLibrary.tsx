@@ -22,6 +22,7 @@ import {
   FileCode,
   ScanText,
   Camera,
+  RotateCw,
 } from 'lucide-react';
 
 interface DocumentLibraryProps {
@@ -357,6 +358,14 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
             Saved Offline ({documents.length})
           </h3>
+          <button
+            id="library-refresh-btn"
+            onClick={onRefreshDocuments}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-white/5 transition"
+            title="Refresh document library"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <div className="flex items-center gap-3">

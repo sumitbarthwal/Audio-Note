@@ -74,6 +74,22 @@ export async function getDocument(id: string): Promise<DocumentItem | null> {
   }
 }
 
+// Cross-tab synchronization channel
+export const syncChannel =
+  typeof window !== 'undefined' && 'BroadcastChannel' in window
+    ? new BroadcastChannel('audiodoc_sync_channel')
+    : null;
+
+export function notifyDataChanged(reason: string = 'updated') {
+  if (syncChannel) {
+    try {
+      syncChannel.postMessage({ type: 'DOCUMENTS_UPDATED', reason, timestamp: Date.now() });
+    } catch {
+      // Ignore broadcast channel errors
+    }
+  }
+}
+
 export async function saveDocument(doc: DocumentItem): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -85,7 +101,10 @@ export async function saveDocument(doc: DocumentItem): Promise<void> {
     };
     const req = store.put(updatedDoc);
 
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => {
+      notifyDataChanged('saveDocument');
+      resolve();
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -97,7 +116,10 @@ export async function deleteDocument(id: string): Promise<void> {
     const store = tx.objectStore(STORE_DOCS);
     const req = store.delete(id);
 
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => {
+      notifyDataChanged('deleteDocument');
+      resolve();
+    };
     req.onerror = () => reject(req.error);
   });
 }

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { DocumentItem } from './types';
-import { getAllDocuments, saveDocument } from './lib/db';
+import { getAllDocuments, saveDocument, syncChannel } from './lib/db';
 import { SAMPLE_DOCUMENTS } from './lib/sampleDocs';
 import { audioEngine } from './lib/audioEngine';
 import { Navbar } from './components/Navbar';
@@ -15,6 +15,8 @@ import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { OnTheGoPlayer } from './components/OnTheGoPlayer';
 import { VoiceSettingsModal } from './components/VoiceSettingsModal';
 import { SleepTimerModal } from './components/SleepTimerModal';
+import { AppRefreshBanner } from './components/AppRefreshBanner';
+import { useAppRefresh } from './hooks/useAppRefresh';
 
 export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -48,8 +50,36 @@ export default function App() {
     }
   }, [activeDoc]);
 
+  // Hook for automatic update detection, background refresh, and manual refresh controls
+  const {
+    isRefreshing,
+    hasUpdate,
+    updateCountdown,
+    autoUpdateEnabled,
+    lastChecked,
+    statusMessage,
+    setAutoUpdateEnabled,
+    refreshApp,
+    applyUpdateNow,
+    dismissUpdate,
+  } = useAppRefresh(refreshDocuments);
+
   useEffect(() => {
     refreshDocuments();
+  }, [refreshDocuments]);
+
+  // Multi-tab / cross-window synchronization: automatically refresh document lists when changed
+  useEffect(() => {
+    if (!syncChannel) return;
+    const handleSyncMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'DOCUMENTS_UPDATED') {
+        refreshDocuments();
+      }
+    };
+    syncChannel.addEventListener('message', handleSyncMessage);
+    return () => {
+      syncChannel.removeEventListener('message', handleSyncMessage);
+    };
   }, [refreshDocuments]);
 
   // Handle document selection
@@ -59,7 +89,7 @@ export default function App() {
     setCurrentView('reader');
   };
 
-  // Global keyboard shortcuts (Space for Play/Pause, Left/Right for Seek, G for On-The-Go)
+  // Global keyboard shortcuts (Space for Play/Pause, Left/Right for Seek, G for On-The-Go, Alt+R for Refresh)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept if user is typing in an input or textarea
@@ -77,12 +107,15 @@ export default function App() {
         audioEngine.skipForward();
       } else if (e.key.toLowerCase() === 'g' && activeDoc) {
         setIsOnTheGoOpen((prev) => !prev);
+      } else if ((e.altKey && e.key.toLowerCase() === 'r') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'r')) {
+        e.preventDefault();
+        refreshApp(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeDoc]);
+  }, [activeDoc, refreshApp]);
 
   return (
     <div className="h-full h-[100dvh] bg-[#0A0B10] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-hidden font-sans">
@@ -95,12 +128,29 @@ export default function App() {
         <Navbar
           currentView={currentView}
           hasActiveDocument={!!activeDoc}
+          isRefreshing={isRefreshing}
+          hasUpdate={hasUpdate}
+          autoUpdateEnabled={autoUpdateEnabled}
+          lastChecked={lastChecked}
           onSelectView={(view) => setCurrentView(view)}
           onOpenVoiceSettings={() => setIsVoiceSettingsOpen(true)}
           onOpenSleepTimer={() => setIsSleepTimerOpen(true)}
           onOpenOnTheGo={() => setIsOnTheGoOpen(true)}
+          onRefreshApp={refreshApp}
+          onToggleAutoUpdate={setAutoUpdateEnabled}
         />
       )}
+
+      {/* Automatic Update & Refresh Notification Banner */}
+      <AppRefreshBanner
+        hasUpdate={hasUpdate}
+        updateCountdown={updateCountdown}
+        statusMessage={statusMessage}
+        autoUpdateEnabled={autoUpdateEnabled}
+        onApplyUpdate={applyUpdateNow}
+        onDismissUpdate={dismissUpdate}
+        onToggleAutoUpdate={setAutoUpdateEnabled}
+      />
 
       {/* Main Content Area - Scrollable Viewport Container */}
       <main className="flex-1 min-h-0 flex flex-col relative z-10 overflow-hidden">
