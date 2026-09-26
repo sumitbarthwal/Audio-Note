@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>Offline Audio Reader</title>
+    <script type="text/javascript">
+      // GitHub Pages SPA redirect: handles subpaths and direct routes
+      var currentUrl = window.location.href;
+      var repoPath = window.location.pathname;
+      // If we are at a subpath, redirect to the base index.html
+      var segments = repoPath.split('/').filter(Boolean);
+      if (segments.length > 1) {
+        var base = '/' + segments[0] + '/';
+        window.location.replace(base);
+      } else {
+        window.location.replace('./');
+      }
+    </script>
+  </head>
+  <body style="background-color: #0A0B10; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+    <div style="text-align: center;">
+      <p>Redirecting to Offline Audio Reader...</p>
+    </div>
+  </body>
+</html>
