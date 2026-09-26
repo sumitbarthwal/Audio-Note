@@ -85,12 +85,12 @@ export default function App() {
   }, [activeDoc]);
 
   return (
-    <div className="min-h-screen bg-[#0A0B10] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden font-sans">
+    <div className="h-full h-[100dvh] bg-[#0A0B10] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-hidden font-sans">
       {/* Immersive UI Ambient Blur Background Glows */}
       <div className="fixed top-[-100px] left-[-100px] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none -z-10" />
       <div className="fixed bottom-[-150px] right-[-100px] w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px] pointer-events-none -z-10" />
 
-      {/* Navbar (hidden when in On-The-Go fullscreen mode) */}
+      {/* Persistent App Header (hidden when in On-The-Go fullscreen mode) */}
       {!isOnTheGoOpen && (
         <Navbar
           currentView={currentView}
@@ -102,10 +102,10 @@ export default function App() {
         />
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 relative z-10">
+      {/* Main Content Area - Scrollable Viewport Container */}
+      <main className="flex-1 min-h-0 flex flex-col relative z-10 overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex-1 flex items-center justify-center min-h-[60vh]">
             <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
           </div>
         ) : currentView === 'library' || !activeDoc ? (
@@ -124,7 +124,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating Audio Player Bar */}
+      {/* Persistent Audio Player Footer Bar */}
       {!isOnTheGoOpen && activeDoc && (
         <AudioPlayerBar
           document={activeDoc}

@@ -21,7 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenOnTheGo,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-[#0D0F16]/80 backdrop-blur-md border-b border-white/5 px-4 sm:px-8 py-3.5 transition-colors">
+    <header className="shrink-0 z-40 bg-[#0D0F16]/95 backdrop-blur-md border-b border-white/5 px-4 sm:px-8 py-2.5 sm:py-3 transition-colors relative">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Brand */}
         <div

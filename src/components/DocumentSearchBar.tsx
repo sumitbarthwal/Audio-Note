@@ -79,7 +79,7 @@ export const DocumentSearchBar: React.FC<DocumentSearchBarProps> = ({
   return (
     <div
       id="document-search-container"
-      className="sticky top-[57px] z-25 bg-[#0D0F16]/95 backdrop-blur-xl border-b border-indigo-500/20 shadow-2xl transition-all duration-200 animate-in slide-in-from-top-2"
+      className="shrink-0 z-30 bg-[#0D0F16]/95 backdrop-blur-xl border-b border-indigo-500/20 shadow-xl transition-all duration-200 relative animate-in slide-in-from-top-2"
     >
       <div className="max-w-4xl mx-auto px-4 sm:px-8 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5">

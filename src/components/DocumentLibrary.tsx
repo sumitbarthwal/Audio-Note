@@ -218,8 +218,9 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 space-y-6">
-      {/* Top Banner / Hero */}
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-6 sm:py-8">
+      <div className="max-w-6xl mx-auto space-y-6 pb-12">
+        {/* Top Banner / Hero */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#0D0F16]/80 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] uppercase tracking-widest font-bold text-indigo-400">
@@ -533,6 +534,7 @@ export const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

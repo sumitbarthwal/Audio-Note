@@ -341,9 +341,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   };
 
   return (
-    <div className={`min-h-screen ${themeClasses} pb-32 transition-colors duration-200`}>
-      {/* Reader Top Controls Toolbar */}
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-[#0D0F16]/80 border-b border-white/5 px-4 sm:px-8 py-3.5">
+    <div className={`h-full flex flex-col min-h-0 ${themeClasses} transition-colors duration-200 overflow-hidden`}>
+      {/* Reader Top Controls Toolbar - Persistent Header */}
+      <header className="shrink-0 z-30 backdrop-blur-md bg-[#0D0F16]/95 border-b border-white/5 px-4 sm:px-8 py-2.5 sm:py-3 shadow-sm relative">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
@@ -544,87 +544,89 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         onPlayFromMatch={handlePlayFromMatch}
       />
 
-      {/* Main Document Reading Canvas */}
-      <main className="max-w-3xl mx-auto px-5 py-8 space-y-8">
-        {/* Document Title Header */}
-        <div className="space-y-3 border-b border-white/5 pb-6">
-          <div className="flex items-center gap-2 text-[10px] text-indigo-400 font-bold tracking-widest uppercase">
-            <span>{document.fileType} Document</span>
-            <span>•</span>
-            <span>{document.sections.length} Sections</span>
-            <span>•</span>
-            <span>{document.totalWords.toLocaleString()} Words</span>
+      {/* Main Document Reading Canvas - Dedicated Scrollable Viewport */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-8 py-6 sm:py-10">
+        <div className="max-w-3xl mx-auto space-y-8 pb-16">
+          {/* Document Title Header */}
+          <div className="space-y-3 border-b border-white/5 pb-6">
+            <div className="flex items-center gap-2 text-[10px] text-indigo-400 font-bold tracking-widest uppercase">
+              <span>{document.fileType} Document</span>
+              <span>•</span>
+              <span>{document.sections.length} Sections</span>
+              <span>•</span>
+              <span>{document.totalWords.toLocaleString()} Words</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              {document.title}
+            </h1>
+            <p className="text-xs text-slate-500">
+              Tip: Tap any paragraph below to immediately start offline speech narration from that point.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            {document.title}
-          </h1>
-          <p className="text-xs text-slate-500">
-            Tip: Tap any paragraph below to immediately start offline speech narration from that point.
-          </p>
-        </div>
 
-        {/* Sections / Paragraphs */}
-        <div className={`space-y-6 ${fontClasses}`} style={{ fontSize: `${fontSize}px` }}>
-          {document.sections.map((section, idx) => {
-            const isCurrent = idx === playbackState.currentSectionIndex;
-            const isSpeakingNow = isCurrent && playbackState.isPlaying;
+          {/* Sections / Paragraphs */}
+          <div className={`space-y-6 ${fontClasses}`} style={{ fontSize: `${fontSize}px` }}>
+            {document.sections.map((section, idx) => {
+              const isCurrent = idx === playbackState.currentSectionIndex;
+              const isSpeakingNow = isCurrent && playbackState.isPlaying;
 
-            // Highlight words within current paragraph and search matches
-            const contentDisplay = renderSectionText(section, idx);
+              // Highlight words within current paragraph and search matches
+              const contentDisplay = renderSectionText(section, idx);
 
-            return (
-              <div
-                key={`${section.id}-${idx}`}
-                ref={isCurrent ? activeSectionRef : null}
-                onClick={() => handleParagraphClick(idx)}
-                className={`p-6 sm:p-7 rounded-[28px] cursor-pointer transition-all duration-300 relative group border ${
-                  isCurrent
-                    ? 'bg-white/[0.03] border-indigo-500/50 border-l-4 border-l-indigo-500 shadow-2xl ring-1 ring-indigo-500/20'
-                    : 'bg-white/[0.01] hover:bg-white/[0.025] border-white/5 hover:border-white/10'
-                }`}
-              >
-                {/* Section header info */}
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-mono text-slate-500 group-hover:text-indigo-400 transition uppercase tracking-wider">
-                    {section.title || `Section ${idx + 1}`}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {isCurrent && (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-400">
-                        {isSpeakingNow ? (
-                          <>
-                            <div className="flex items-end gap-0.5 h-3">
-                              <span className="w-0.5 h-2 bg-indigo-400 rounded-full animate-pulse" />
-                              <span className="w-0.5 h-3 bg-indigo-400 rounded-full animate-pulse delay-75" />
-                              <span className="w-0.5 h-1.5 bg-indigo-400 rounded-full animate-pulse delay-150" />
-                            </div>
-                            <span>Speaking</span>
-                          </>
-                        ) : (
-                          'Active'
-                        )}
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddBookmark(idx);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-500 hover:text-indigo-400 transition"
-                      title="Bookmark this section"
-                    >
-                      <Bookmark className="w-3.5 h-3.5" />
-                    </button>
+              return (
+                <div
+                  key={`${section.id}-${idx}`}
+                  ref={isCurrent ? activeSectionRef : null}
+                  onClick={() => handleParagraphClick(idx)}
+                  className={`p-6 sm:p-7 rounded-[28px] cursor-pointer transition-all duration-300 relative group border ${
+                    isCurrent
+                      ? 'bg-white/[0.03] border-indigo-500/50 border-l-4 border-l-indigo-500 shadow-2xl ring-1 ring-indigo-500/20'
+                      : 'bg-white/[0.01] hover:bg-white/[0.025] border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  {/* Section header info */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-mono text-slate-500 group-hover:text-indigo-400 transition uppercase tracking-wider">
+                      {section.title || `Section ${idx + 1}`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isCurrent && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-400">
+                          {isSpeakingNow ? (
+                            <>
+                              <div className="flex items-end gap-0.5 h-3">
+                                <span className="w-0.5 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                                <span className="w-0.5 h-3 bg-indigo-400 rounded-full animate-pulse delay-75" />
+                                <span className="w-0.5 h-1.5 bg-indigo-400 rounded-full animate-pulse delay-150" />
+                              </div>
+                              <span>Speaking</span>
+                            </>
+                          ) : (
+                            'Active'
+                          )}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddBookmark(idx);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-500 hover:text-indigo-400 transition"
+                        title="Bookmark this section"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Paragraph text */}
-                <p className="leading-relaxed whitespace-pre-wrap">{contentDisplay}</p>
-              </div>
-            );
-          })}
+                  {/* Paragraph text */}
+                  <p className="leading-relaxed whitespace-pre-wrap">{contentDisplay}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </main>
+      </div>
 
       {/* Table of Contents & Bookmarks Drawer */}
       {showTOC && (

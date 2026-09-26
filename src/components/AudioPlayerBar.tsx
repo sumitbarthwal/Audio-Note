@@ -54,9 +54,9 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({
   };
 
   return (
-    <div
+    <footer
       id="audio-player-bar"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-[#0D0F16]/90 backdrop-blur-xl border-t border-white/5 shadow-2xl px-4 sm:px-8 py-3 transition-all"
+      className="shrink-0 z-40 bg-[#0D0F16]/95 backdrop-blur-xl border-t border-white/5 shadow-2xl px-4 sm:px-8 py-2.5 sm:py-3 transition-all relative"
     >
       {/* Top progress scrubber line */}
       <div
@@ -191,6 +191,6 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </footer>
   );
 };
